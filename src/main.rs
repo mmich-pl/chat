@@ -6,12 +6,13 @@ use tokio::{
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("localhost:8080").await.unwrap();
-    let (sender, _receiver) = broadcast::channel::<String>(5);
+    let (sender, _receiver) = broadcast::channel(5);
     
     loop {
-        let (mut socket, _addr) = listener.accept().await.unwrap();
+        let (mut socket, addr) = listener.accept().await.unwrap();
         let sender = sender.clone();
         let mut receiver = sender.subscribe();
+        
         tokio::spawn(async move{
             let (reader, mut writer) = socket.split();
 
@@ -25,12 +26,15 @@ async fn main() {
                             break;
                         }
 
-                        sender.send(line.clone()).unwrap();
+                        sender.send((line.clone(), addr)).unwrap();
                         line.clear();
                      }
                      result =  receiver.recv() => {
-                        let message = result .unwrap();
+                        let (message, other_addr) = result .unwrap();
+                        
+                        if addr != other_addr{
                         writer.write_all(message.as_bytes()).await.unwrap();
+                        }
                      }
                 }
             }
